@@ -3,8 +3,6 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
-#include <SD.h>
-#include <SPIFFS.h>
 
 // OLED display settings
 #define SCREEN_WIDTH 128
@@ -17,9 +15,6 @@
 #define RST 12
 #define DIO0 14
 #define BAND 915E6
-
-// SD Card settings
-#define SD_CS 5
 
 // Initialize display
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
@@ -49,25 +44,6 @@ void setup() {
   LoRa.setSignalBandwidth(125E3);
   LoRa.setCodingRate4(5);
   
-  // Initialize SD Card
-  if (!SD.begin(SD_CS)) {
-    Serial.println("SD Card initialization failed!");
-    while (1);
-  }
-  
-  // Create or open the log file
-  File logFile = SD.open("/messages.csv", FILE_WRITE);
-  if (!logFile) {
-    Serial.println("Failed to open log file!");
-    while (1);
-  }
-  
-  // Write CSV header if file is empty
-  if (logFile.size() == 0) {
-    logFile.println("Timestamp,Message");
-  }
-  logFile.close();
-  
   // Initial display
   display.clearDisplay();
   display.setTextSize(1);
@@ -76,6 +52,10 @@ void setup() {
   display.println("Ki-Fi Receiver");
   display.println("Waiting for messages...");
   display.display();
+  
+  // Print status to Serial
+  Serial.println("Ki-Fi Receiver");
+  Serial.println("Waiting for messages...");
 }
 
 void loop() {
@@ -89,8 +69,16 @@ void loop() {
     }
     messageBuffer[i] = '\0';
     
-    // Save to SD card
-    saveMessage(messageBuffer);
+    // Get timestamp
+    unsigned long timestamp = millis();
+    
+    // Print to Serial
+    Serial.print("Message #");
+    Serial.print(++messageCount);
+    Serial.print(" [");
+    Serial.print(timestamp);
+    Serial.println("ms]:");
+    Serial.println(messageBuffer);
     
     // Update display
     display.clearDisplay();
@@ -98,24 +86,8 @@ void loop() {
     display.println("Ki-Fi Receiver");
     display.println("Message received:");
     display.println(messageBuffer);
-    display.println("\nMessages saved:");
+    display.println("\nMessages:");
     display.println(messageCount);
     display.display();
-  }
-}
-
-void saveMessage(const char* message) {
-  File logFile = SD.open("/messages.csv", FILE_WRITE);
-  if (logFile) {
-    // Get current timestamp
-    unsigned long timestamp = millis();
-    
-    // Write to CSV
-    logFile.print(timestamp);
-    logFile.print(",");
-    logFile.println(message);
-    
-    logFile.close();
-    messageCount++;
   }
 } 
