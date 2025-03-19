@@ -15,12 +15,8 @@ def connect_to_device():
 def send_message(interface, message):
     """Send a message via Meshtastic."""
     try:
-        # Configure for broadcast mode
-        interface.getLocalNode().setConfig('lora.modem_preset', 'LONG_FAST')
-        interface.getLocalNode().setConfig('lora.tx_power', 20)
-        
         # Send the message
-        interface.sendText(message, wantAck=True)
+        interface.sendText(message)
         print(f"Message sent successfully: {message}")
         return True
     except Exception as e:
