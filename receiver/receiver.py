@@ -23,6 +23,13 @@ def connect_to_device():
     """Connect to the Meshtastic device."""
     try:
         interface = meshtastic.serial_interface.SerialInterface()
+        
+        # Configure for receiving messages
+        node = interface.getMyNode()
+        node.setConfig('lora.modem_preset', 'LONG_FAST')
+        node.setConfig('lora.tx_power', 20)
+        
+        # Set up message callback
         interface.onReceive = on_message
         return interface
     except Exception as e:
