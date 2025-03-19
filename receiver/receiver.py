@@ -5,23 +5,29 @@ from datetime import datetime
 import pandas as pd
 import os
 
+def on_message(packet, interface):
+    """Callback function for received messages."""
+    try:
+        message = {
+            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'text': packet.get('decoded', {}).get('text', ''),
+            'from': packet.get('from', 'unknown'),
+            'to': packet.get('to', 'broadcast')
+        }
+        print(f"\nReceived message: {message['text']}")
+        save_to_excel([message])
+    except Exception as e:
+        print(f"Error processing message: {e}")
+
 def connect_to_device():
     """Connect to the Meshtastic device."""
     try:
         interface = meshtastic.serial_interface.SerialInterface()
+        interface.onReceive = on_message
         return interface
     except Exception as e:
         print(f"Error connecting to device: {e}")
         return None
-
-def get_messages(interface):
-    """Get messages from the device."""
-    try:
-        messages = interface.getMyNode().get("messages", [])
-        return messages
-    except Exception as e:
-        print(f"Error getting messages: {e}")
-        return []
 
 def save_to_excel(messages, filename="received_messages.xlsx"):
     """Save messages to an Excel file."""
@@ -29,12 +35,13 @@ def save_to_excel(messages, filename="received_messages.xlsx"):
         # Convert messages to DataFrame
         df = pd.DataFrame(messages)
         
-        # Add timestamp if not present
-        if 'timestamp' not in df.columns:
-            df['timestamp'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
         # Create Excel writer
         with pd.ExcelWriter(filename, engine='xlsxwriter') as writer:
+            # If file exists, load existing data and append new messages
+            if os.path.exists(filename):
+                existing_df = pd.read_excel(filename)
+                df = pd.concat([existing_df, df], ignore_index=True)
+            
             df.to_excel(writer, sheet_name='Messages', index=False)
             
             # Get the workbook and worksheet objects
@@ -59,8 +66,9 @@ def save_to_excel(messages, filename="received_messages.xlsx"):
                 worksheet.write(0, col_num, value, header_format)
             
             # Set column widths
-            worksheet.set_column('A:A', 20)  # Timestamp column
-            worksheet.set_column('B:B', 50)  # Message column
+            for col_num, column in enumerate(df.columns):
+                max_length = max(df[column].astype(str).apply(len).max(), len(column))
+                worksheet.set_column(col_num, col_num, max_length + 2)
             
             # Format all cells
             for row in range(1, len(df) + 1):
@@ -82,22 +90,13 @@ def main():
     
     print("Connected successfully!")
     print("Waiting for messages...")
-    print("Press Ctrl+C to exit and save messages")
+    print("Press Ctrl+C to exit")
     
     try:
         while True:
-            messages = get_messages(interface)
-            if messages:
-                print(f"\nReceived {len(messages)} new messages")
-                for msg in messages:
-                    print(f"Message: {msg.get('text', '')}")
-                save_to_excel(messages)
-            time.sleep(1)  # Check for new messages every second
+            time.sleep(1)  # Keep the script running
     except KeyboardInterrupt:
-        print("\nExiting and saving messages...")
-        messages = get_messages(interface)
-        if messages:
-            save_to_excel(messages)
+        print("\nExiting...")
     finally:
         interface.close()
 

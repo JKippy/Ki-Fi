@@ -15,12 +15,6 @@ def connect_to_device():
 def send_message(interface, message):
     """Send a message via Meshtastic."""
     try:
-        # Get the first node in the mesh
-        nodes = interface.getNodes()
-        if not nodes:
-            print("No nodes found in the mesh")
-            return False
-        
         # Send the message
         interface.sendText(message)
         print(f"Message sent successfully: {message}")
