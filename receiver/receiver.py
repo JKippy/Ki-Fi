@@ -25,7 +25,7 @@ def connect_to_device():
         interface = meshtastic.serial_interface.SerialInterface()
         
         # Configure for receiving messages
-        node = interface.getMyNode()
+        node = interface.getLocalNode()
         node.setConfig('lora.modem_preset', 'LONG_FAST')
         node.setConfig('lora.tx_power', 20)
         
