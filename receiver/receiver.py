@@ -5,9 +5,19 @@ from datetime import datetime
 import pandas as pd
 import os
 
+# Track received message IDs to prevent duplicates
+received_messages = set()
+
 def on_message(packet, interface):
     """Callback function for received messages."""
     try:
+        # Skip if we've already seen this message
+        if packet.get('id') in received_messages:
+            return
+            
+        # Add message ID to received set
+        received_messages.add(packet.get('id'))
+        
         print("\nReceived packet:", packet)  # Debug: Print raw packet
         message = {
             'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -25,6 +35,16 @@ def connect_to_device():
     """Connect to the Meshtastic device."""
     try:
         interface = meshtastic.serial_interface.SerialInterface()
+        
+        # Configure for secure communication
+        node = interface.getLocalNode()
+        # Set a custom channel name (this acts as a password)
+        node.setConfig('lora.channel_name', 'KiFiSecure')
+        # Set a custom PSK (Pre-Shared Key)
+        node.setConfig('lora.psk', 'KiFiSecretKey123')
+        # Set the modem preset for better range
+        node.setConfig('lora.modem_preset', 'LONG_FAST')
+        
         # Set up message callback
         interface.onReceive = on_message
         return interface

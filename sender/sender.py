@@ -7,6 +7,16 @@ def connect_to_device():
     """Connect to the Meshtastic device."""
     try:
         interface = meshtastic.serial_interface.SerialInterface()
+        
+        # Configure for secure communication
+        node = interface.getLocalNode()
+        # Set a custom channel name (this acts as a password)
+        node.setConfig('lora.channel_name', 'KiFiSecure')
+        # Set a custom PSK (Pre-Shared Key)
+        node.setConfig('lora.psk', 'KiFiSecretKey123')
+        # Set the modem preset for better range
+        node.setConfig('lora.modem_preset', 'LONG_FAST')
+        
         return interface
     except Exception as e:
         print(f"Error connecting to device: {e}")
