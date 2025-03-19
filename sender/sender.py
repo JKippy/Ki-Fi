@@ -15,12 +15,15 @@ def connect_to_device():
 def send_message(interface, message):
     """Send a message via Meshtastic."""
     try:
+        print(f"Attempting to send message: {message}")  # Debug: Print attempt
         # Send the message
         interface.sendText(message)
         print(f"Message sent successfully: {message}")
+        print("Waiting for acknowledgment...")  # Debug: Print waiting status
         return True
     except Exception as e:
         print(f"Error sending message: {e}")
+        print(f"Error type: {type(e)}")  # Debug: Print error type
         return False
 
 def main():

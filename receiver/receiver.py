@@ -8,16 +8,18 @@ import os
 def on_message(packet, interface):
     """Callback function for received messages."""
     try:
+        print("\nReceived packet:", packet)  # Debug: Print raw packet
         message = {
             'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             'text': packet.get('decoded', {}).get('text', ''),
             'from': packet.get('from', 'unknown'),
             'to': packet.get('to', 'broadcast')
         }
-        print(f"\nReceived message: {message['text']}")
+        print(f"Processed message: {message}")  # Debug: Print processed message
         save_to_excel([message])
     except Exception as e:
         print(f"Error processing message: {e}")
+        print(f"Packet contents: {packet}")  # Debug: Print packet on error
 
 def connect_to_device():
     """Connect to the Meshtastic device."""
