@@ -8,6 +8,10 @@ from datetime import datetime
 from pubsub import pub
 from meshtastic.serial_interface import SerialInterface
 from meshtastic import portnums_pb2
+from cryptography.fernet import Fernet
+import base64
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 # Global variable to store the SerialInterface instance
 local = None
@@ -179,17 +183,44 @@ def parse_node_info(node_info):
     print("Node info parsed.")
     return nodes
 
-def on_receive(packet, interface, node_list, allowed_sender_id):
+def generate_key(password):
+    """Generate a key from a password using PBKDF2"""
+    salt = b'kifi_salt'  # In production, use a random salt and store it securely
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=100000,
+    )
+    key = base64.urlsafe_b64encode(kdf.derive(password.encode()))
+    return key
+
+def decrypt_message(encrypted_message, key):
+    """Decrypt a message using Fernet (AES-128-CBC)"""
+    try:
+        f = Fernet(key)
+        decrypted_message = f.decrypt(encrypted_message.encode())
+        return decrypted_message.decode()
+    except Exception as e:
+        print(f"Error decrypting message: {e}")
+        return None
+
+def on_receive(packet, interface, node_list, allowed_sender_id, encryption_key):
     try:
         if packet['decoded']['portnum'] == 'TEXT_MESSAGE_APP':
             fromnum = packet['fromId']
             # Only process messages from the allowed sender
             if fromnum == allowed_sender_id:
-                message = packet['decoded']['payload'].decode('utf-8')
-                shortname = next((node['user']['shortName'] for node in node_list if node['num'] == fromnum), 'Unknown')
-                print(f"{shortname}: {message}")
-                # Log the message to file
-                log_message(message, shortname)
+                encrypted_message = packet['decoded']['payload'].decode('utf-8')
+                # Try to decrypt the message
+                message = decrypt_message(encrypted_message, encryption_key)
+                if message:
+                    shortname = next((node['user']['shortName'] for node in node_list if node['num'] == fromnum), 'Unknown')
+                    print(f"{shortname}: {message}")
+                    # Log the message to file
+                    log_message(message, shortname)
+                else:
+                    print("Failed to decrypt message")
             else:
                 print(f"Ignoring message from unauthorized node {fromnum}")
     except KeyError:
@@ -239,11 +270,15 @@ def main():
         except ValueError:
             print("Please enter a valid number for the node ID.")
 
-    print(f"Only accepting messages from node {allowed_sender_id}")
+    # Get encryption password from user
+    password = input("Enter the encryption password: ")
+    encryption_key = generate_key(password)
+
+    print(f"Only accepting encrypted messages from node {allowed_sender_id}")
 
     # Subscribe the callback function to message reception
     def on_receive_wrapper(packet, interface):
-        on_receive(packet, interface, node_list, allowed_sender_id)
+        on_receive(packet, interface, node_list, allowed_sender_id, encryption_key)
 
     pub.subscribe(on_receive_wrapper, "meshtastic.receive")
     print("Subscribed to meshtastic.receive")
