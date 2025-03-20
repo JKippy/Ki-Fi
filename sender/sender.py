@@ -12,17 +12,17 @@ def check_device_connection():
     except Exception:
         return False
 
-def send_message(message):
-    """Send a message via Meshtastic CLI."""
+def send_message(message, target_node_id):
+    """Send a message via Meshtastic CLI to a specific node."""
     try:
-        print(f"Attempting to send message: {message}")
-        # Use meshtastic CLI to send message
-        result = subprocess.run(['meshtastic', '--sendtext', message], 
+        print(f"Attempting to send message to node {target_node_id}: {message}")
+        # Use meshtastic CLI to send message to specific node
+        result = subprocess.run(['meshtastic', '--sendtext', message, '--dest', str(target_node_id)], 
                               capture_output=True, 
                               text=True)
         
         if result.returncode == 0:
-            print(f"Message sent successfully: {message}")
+            print(f"Message sent successfully to node {target_node_id}: {message}")
             return True
         else:
             print(f"Error sending message: {result.stderr}")
@@ -40,13 +40,22 @@ def main():
         return
         
     print("Device connected successfully!")
-    print("Enter messages to send (press Ctrl+C to exit):")
+    
+    # Get the target node ID from user input
+    while True:
+        try:
+            target_node_id = int(input("Enter the target node ID to send messages to: "))
+            break
+        except ValueError:
+            print("Please enter a valid number for the node ID.")
+    
+    print(f"Enter messages to send to node {target_node_id} (press Ctrl+C to exit):")
     
     try:
         while True:
             message = input("> ")
             if message:
-                send_message(message)
+                send_message(message, target_node_id)
     except KeyboardInterrupt:
         print("\nExiting...")
 
