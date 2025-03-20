@@ -4,7 +4,7 @@ from pubsub import pub
 from meshtastic.serial_interface import SerialInterface
 from meshtastic import portnums_pb2
 
-serial_port = '/dev/ttyACM0'  # Replace with your Meshtastic device's serial port
+serial_port = '/dev/ttyUSB0'  # Replace with your Meshtastic device's serial port
 
 def get_node_info(serial_port):
     print("Initializing SerialInterface to get node info...")
