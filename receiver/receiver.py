@@ -4,12 +4,14 @@ import os
 import serial
 import signal
 import subprocess
+from datetime import datetime
 from pubsub import pub
 from meshtastic.serial_interface import SerialInterface
 from meshtastic import portnums_pb2
 
 # Global variable to store the SerialInterface instance
 local = None
+LOG_FILE = "meshtastic_messages.txt"
 
 def signal_handler(signum, frame):
     """Handle Ctrl+C gracefully"""
@@ -21,24 +23,38 @@ def signal_handler(signum, frame):
             pass
     sys.exit(0)
 
-def check_usb_device():
+def log_message(message, sender):
+    """Log message to file with timestamp"""
+    try:
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        log_entry = f"[{timestamp}] {sender}: {message}\n"
+        
+        with open(LOG_FILE, "a", encoding='utf-8') as f:
+            f.write(log_entry)
+        print(f"Message logged to {LOG_FILE}")
+    except Exception as e:
+        print(f"Error logging message: {e}")
+
+def check_usb_device(show_info=False):
     """Check USB device status"""
-    print("\nChecking USB device status...")
     try:
         # Check USB devices
         result = subprocess.run(['system_profiler', 'SPUSBDataType'], capture_output=True, text=True)
-        print("USB Devices:")
-        print(result.stdout)
+        if show_info:
+            print("USB Devices:")
+            print(result.stdout)
         
         # Check serial ports
         result = subprocess.run(['ls', '-l', '/dev/tty.*'], capture_output=True, text=True)
-        print("\nSerial Ports:")
-        print(result.stdout)
+        if show_info:
+            print("\nSerial Ports:")
+            print(result.stdout)
         
         # Check if any process is using the port
         result = subprocess.run(['lsof', '|', 'grep', 'usbserial'], shell=True, capture_output=True, text=True)
-        print("\nProcesses using serial port:")
-        print(result.stdout)
+        if show_info:
+            print("\nProcesses using serial port:")
+            print(result.stdout)
         
         return True
     except Exception as e:
@@ -170,6 +186,8 @@ def on_receive(packet, interface, node_list):
             fromnum = packet['fromId']
             shortname = next((node['user']['shortName'] for node in node_list if node['num'] == fromnum), 'Unknown')
             print(f"{shortname}: {message}")
+            # Log the message to file
+            log_message(message, shortname)
     except KeyError:
         pass  # Ignore KeyError silently
     except UnicodeDecodeError:
@@ -182,9 +200,11 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     
-    # Check USB device status first
-    if not check_usb_device():
+    # Check USB device status first (without showing info)
+    if not check_usb_device(show_info=False):
         print("Warning: Could not check USB device status")
+        # If there's an issue, show the device info for debugging
+        check_usb_device(show_info=True)
     
     # Find the correct port for the Meshtastic device
     serial_port = find_meshtastic_port()
