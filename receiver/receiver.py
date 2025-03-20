@@ -179,15 +179,19 @@ def parse_node_info(node_info):
     print("Node info parsed.")
     return nodes
 
-def on_receive(packet, interface, node_list):
+def on_receive(packet, interface, node_list, allowed_sender_id):
     try:
         if packet['decoded']['portnum'] == 'TEXT_MESSAGE_APP':
-            message = packet['decoded']['payload'].decode('utf-8')
             fromnum = packet['fromId']
-            shortname = next((node['user']['shortName'] for node in node_list if node['num'] == fromnum), 'Unknown')
-            print(f"{shortname}: {message}")
-            # Log the message to file
-            log_message(message, shortname)
+            # Only process messages from the allowed sender
+            if fromnum == allowed_sender_id:
+                message = packet['decoded']['payload'].decode('utf-8')
+                shortname = next((node['user']['shortName'] for node in node_list if node['num'] == fromnum), 'Unknown')
+                print(f"{shortname}: {message}")
+                # Log the message to file
+                log_message(message, shortname)
+            else:
+                print(f"Ignoring message from unauthorized node {fromnum}")
     except KeyError:
         pass  # Ignore KeyError silently
     except UnicodeDecodeError:
@@ -227,9 +231,19 @@ def main():
     for node in node_list:
         print(node)
 
+    # Get the allowed sender ID from user input
+    while True:
+        try:
+            allowed_sender_id = str(input("Enter the node ID that is allowed to send messages: "))
+            break
+        except ValueError:
+            print("Please enter a valid number for the node ID.")
+
+    print(f"Only accepting messages from node {allowed_sender_id}")
+
     # Subscribe the callback function to message reception
     def on_receive_wrapper(packet, interface):
-        on_receive(packet, interface, node_list)
+        on_receive(packet, interface, node_list, allowed_sender_id)
 
     pub.subscribe(on_receive_wrapper, "meshtastic.receive")
     print("Subscribed to meshtastic.receive")
