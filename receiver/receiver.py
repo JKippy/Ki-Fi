@@ -1,13 +1,30 @@
 import time
 import sys
+import os
 from pubsub import pub
 from meshtastic.serial_interface import SerialInterface
 from meshtastic import portnums_pb2
 
-serial_port = '/dev/ttyUSB0'  # Replace with your Meshtastic device's serial port
+def find_meshtastic_port():
+    """Find the Meshtastic device port based on the operating system"""
+    if sys.platform == 'darwin':  # macOS
+        # Common patterns for Meshtastic devices on macOS
+        patterns = [
+            '/dev/tty.usbserial*',
+            '/dev/tty.SLAB_USBtoUART*',
+            '/dev/tty.usbmodem*'
+        ]
+        for pattern in patterns:
+            import glob
+            ports = glob.glob(pattern)
+            if ports:
+                return ports[0]
+    else:  # Linux/Ubuntu
+        return '/dev/ttyUSB0'
+    return None
 
 def get_node_info(serial_port):
-    print("Initializing SerialInterface to get node info...")
+    print(f"Initializing SerialInterface to get node info on port {serial_port}...")
     local = SerialInterface(serial_port)
     node_info = local.nodes
     local.close()
@@ -40,6 +57,12 @@ def on_receive(packet, interface, node_list):
         pass  # Ignore UnicodeDecodeError silently
 
 def main():
+    # Find the correct port for the Meshtastic device
+    serial_port = find_meshtastic_port()
+    if not serial_port:
+        print("Error: Could not find Meshtastic device. Please check your connection.")
+        sys.exit(1)
+
     print(f"Using serial port: {serial_port}")
 
     # Retrieve and parse node information
