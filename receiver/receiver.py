@@ -1,56 +1,34 @@
-import meshtastic
-import meshtastic.serial_interface
+import subprocess
 import time
 from datetime import datetime
 import pandas as pd
 import os
+import json
 
 # Track received message IDs to prevent duplicates
 received_messages = set()
 
-def on_message(packet, interface):
-    """Callback function for received messages."""
+def process_message(message_data):
+    """Process a received message and save it to Excel."""
     try:
         # Skip if we've already seen this message
-        if packet.get('id') in received_messages:
+        if message_data.get('id') in received_messages:
             return
             
         # Add message ID to received set
-        received_messages.add(packet.get('id'))
+        received_messages.add(message_data.get('id'))
         
-        print("\nReceived packet:", packet)  # Debug: Print raw packet
+        print("\nReceived message:", message_data)
         message = {
             'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            'text': packet.get('decoded', {}).get('text', ''),
-            'from': packet.get('from', 'unknown'),
-            'to': packet.get('to', 'broadcast')
+            'text': message_data.get('decoded', {}).get('text', ''),
+            'from': message_data.get('from', 'unknown'),
+            'to': message_data.get('to', 'broadcast')
         }
-        print(f"Processed message: {message}")  # Debug: Print processed message
+        print(f"Processed message: {message}")
         save_to_excel([message])
     except Exception as e:
         print(f"Error processing message: {e}")
-        print(f"Packet contents: {packet}")  # Debug: Print packet on error
-
-def connect_to_device():
-    """Connect to the Meshtastic device."""
-    try:
-        interface = meshtastic.serial_interface.SerialInterface()
-        
-        # Configure for secure communication
-        node = interface.getLocalNode()
-        # Set a custom channel name (this acts as a password)
-        node.setConfig('lora.channel_name', 'KiFiSecure')
-        # Set a custom PSK (Pre-Shared Key)
-        node.setConfig('lora.psk', 'KiFiSecretKey123')
-        # Set the modem preset for better range
-        node.setConfig('lora.modem_preset', 'LONG_FAST')
-        
-        # Set up message callback
-        interface.onReceive = on_message
-        return interface
-    except Exception as e:
-        print(f"Error connecting to device: {e}")
-        return None
 
 def save_to_excel(messages, filename="received_messages.xlsx"):
     """Save messages to an Excel file."""
@@ -104,24 +82,29 @@ def save_to_excel(messages, filename="received_messages.xlsx"):
 
 def main():
     print("Ki-Fi Receiver")
-    print("Connecting to device...")
-    
-    interface = connect_to_device()
-    if not interface:
-        print("Failed to connect to device. Exiting...")
-        return
-    
-    print("Connected successfully!")
-    print("Waiting for messages...")
+    print("Starting message monitoring...")
     print("Press Ctrl+C to exit")
     
     try:
         while True:
-            time.sleep(1)  # Keep the script running
+            # Use meshtastic CLI to get messages
+            result = subprocess.run(['meshtastic', '--get-messages'], 
+                                 capture_output=True, 
+                                 text=True)
+            
+            if result.returncode == 0:
+                try:
+                    messages = json.loads(result.stdout)
+                    if messages:
+                        for msg in messages:
+                            process_message(msg)
+                except json.JSONDecodeError:
+                    pass  # No valid messages to process
+            
+            time.sleep(1)  # Check for new messages every second
+            
     except KeyboardInterrupt:
         print("\nExiting...")
-    finally:
-        interface.close()
 
 if __name__ == "__main__":
     main() 
