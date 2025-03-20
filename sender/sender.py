@@ -2,6 +2,16 @@ import subprocess
 import time
 from datetime import datetime
 
+def check_device_connection():
+    """Check if a Meshtastic device is connected."""
+    try:
+        result = subprocess.run(['meshtastic', '--info'], 
+                              capture_output=True, 
+                              text=True)
+        return result.returncode == 0
+    except Exception:
+        return False
+
 def send_message(message):
     """Send a message via Meshtastic CLI."""
     try:
@@ -23,6 +33,13 @@ def send_message(message):
 
 def main():
     print("Ki-Fi Sender")
+    print("Checking device connection...")
+    
+    if not check_device_connection():
+        print("Error: No Meshtastic device found. Please connect a device and try again.")
+        return
+        
+    print("Device connected successfully!")
     print("Enter messages to send (press Ctrl+C to exit):")
     
     try:

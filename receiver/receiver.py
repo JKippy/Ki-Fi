@@ -80,8 +80,25 @@ def save_to_excel(messages, filename="received_messages.xlsx"):
     except Exception as e:
         print(f"Error saving to Excel: {e}")
 
+def check_device_connection():
+    """Check if a Meshtastic device is connected."""
+    try:
+        result = subprocess.run(['meshtastic', '--info'], 
+                              capture_output=True, 
+                              text=True)
+        return result.returncode == 0
+    except Exception:
+        return False
+
 def main():
     print("Ki-Fi Receiver")
+    print("Checking device connection...")
+    
+    if not check_device_connection():
+        print("Error: No Meshtastic device found. Please connect a device and try again.")
+        return
+        
+    print("Device connected successfully!")
     print("Starting message monitoring...")
     print("Press Ctrl+C to exit")
     
