@@ -136,34 +136,15 @@ def create_serial_interface(port, timeout=5):
                 pass
         return None
 
-def get_node_info(serial_port):
-    print(f"\nInitializing SerialInterface to get node info on port {serial_port}...")
+def get_node_info(interface):
+    """Get information about the current node."""
     try:
-        # First test the serial connection
-        if not test_serial_connection(serial_port):
-            print("Failed to establish basic serial connection")
-            return None
-
-        # Try to create the interface with a timeout
-        interface = create_serial_interface(serial_port)
-        if not interface:
-            print("Failed to create SerialInterface")
-            return None
-
-        try:
-            print("Attempting to get nodes...")
-            node_info = interface.nodes
-            print("Nodes retrieved successfully")
-            return node_info
-        finally:
-            print("Closing interface...")
-            interface.close()
-            print("Interface closed successfully")
-            
-    except Exception as e:
-        print(f"Error getting node info: {e}")
-        print(f"Error type: {type(e).__name__}")
-        print(f"Error details: {e.__dict__ if hasattr(e, '__dict__') else 'No details available'}")
+        node_info = interface.nodes
+        for node_id, node in node_info.items():
+            if node.get('user', {}).get('shortName'):
+                return str(node_id)
+        return None
+    except Exception:
         return None
 
 def parse_node_info(node_info):
@@ -179,15 +160,19 @@ def parse_node_info(node_info):
     print("Node info parsed.")
     return nodes
 
-def on_receive(packet, interface, node_list):
+def on_receive(packet, interface, node_list, allowed_sender_id):
     try:
         if packet['decoded']['portnum'] == 'TEXT_MESSAGE_APP':
-            message = packet['decoded']['payload'].decode('utf-8')
             fromnum = packet['fromId']
-            shortname = next((node['user']['shortName'] for node in node_list if node['num'] == fromnum), 'Unknown')
-            print(f"{shortname}: {message}")
-            # Log the message to file
-            log_message(message, shortname)
+            # Only process messages from the allowed sender
+            if fromnum == allowed_sender_id:
+                message = packet['decoded']['payload'].decode('utf-8')
+                shortname = next((node['user']['shortName'] for node in node_list if node['num'] == fromnum), 'Unknown')
+                print(f"{shortname}: {message}")
+                # Log the message to file
+                log_message(message, shortname)
+            else:
+                print(f"Ignoring message from unauthorized node {fromnum}")
     except KeyError:
         pass  # Ignore KeyError silently
     except UnicodeDecodeError:
@@ -227,9 +212,31 @@ def main():
     for node in node_list:
         print(node)
 
+    # Get the current node's ID
+    current_node_id = get_node_info(local)
+    if not current_node_id:
+        print("Error: Could not get current node ID")
+        sys.exit(1)
+    
+    print(f"Current node ID: {current_node_id}")
+
+    # Get the allowed sender ID from user input
+    while True:
+        try:
+            allowed_sender_id = str(input("Enter the node ID that is allowed to send messages: "))
+            if allowed_sender_id == current_node_id:
+                print("Error: Cannot receive messages from yourself")
+                continue
+            break
+        except ValueError:
+            print("Please enter a valid number for the node ID.")
+
+    print(f"Only accepting messages from node {allowed_sender_id}")
+    print("All other messages will be ignored.")
+
     # Subscribe the callback function to message reception
     def on_receive_wrapper(packet, interface):
-        on_receive(packet, interface, node_list)
+        on_receive(packet, interface, node_list, allowed_sender_id)
 
     pub.subscribe(on_receive_wrapper, "meshtastic.receive")
     print("Subscribed to meshtastic.receive")
